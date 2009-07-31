@@ -7,6 +7,7 @@ setup(
         license = 'proprietary',
         description = "Python module implementing SSMI for USSD and SMS.",
         author = 'Morgan Collett',
+        author_email = 'morgan@praekelt.com',
         packages = find_packages('src'),
         package_dir = {'': 'src'},
         install_requires = ['setuptools'],

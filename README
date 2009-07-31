@@ -3,8 +3,23 @@ python-ssmi
 
 This is a python module implementing TruTeq's SSMI protocol for USSD and SMS.
 
-developing
-==========
+setting up buildout
+===================
 
 This module follows the buildout instructions documented at
 http://jacobian.org/writing/django-apps-with-buildout/
+
+To initialise buildout run:
+$ python bootstrap.py
+
+Then run buildout:
+$ ./bin/buildout
+
+generating releases
+===================
+
+Create a source tarball:
+$ ./bin/buildout setup . sdist
+
+Create an egg:
+$ ./bin/buildout setup . bdist_egg

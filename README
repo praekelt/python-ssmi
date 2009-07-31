@@ -1,0 +1,10 @@
+python-ssmi
+===========
+
+This is a python module implementing TruTeq's SSMI protocol for USSD and SMS.
+
+developing
+==========
+
+This module follows the buildout instructions documented at
+http://jacobian.org/writing/django-apps-with-buildout/

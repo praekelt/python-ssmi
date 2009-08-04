@@ -3,6 +3,9 @@ python-ssmi
 
 This is a python module implementing TruTeq's SSMI protocol for USSD and SMS.
 
+This was implemented from SSMI version 1.5.9 documentation which is copyright
+TruTeq Wireless (Pty) Ltd 2001-2003.
+
 setting up buildout
 ===================
 

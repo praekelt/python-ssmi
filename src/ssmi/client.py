@@ -1,5 +1,7 @@
 """Python module for SSMI protocol to send/receive USSD and SMS."""
 
+# Copyright 2009 Praekelt International, all rights reserved
+
 # Imports
 
 from twisted.internet import reactor, protocol
@@ -64,8 +66,20 @@ nack_reason = {
 class SSMIClient(protocol.Protocol):
     """Client for SSMI"""
 
-    username = USERNAME
-    password = PASSWORD
+    def __init__(self, username, password, callback, errback):
+        """init SSMIClient.
+
+        username: string -- username for SSMI service
+        password: string -- password for SSMI service
+        callback: lambda -- callback for data received
+        errback: lambda -- callback for error handling
+
+        """
+        self.username = username
+        self.password = password
+        self.callback = callback
+        self.errback = errback
+        print 'ran SSMIClient init'
 
     def connectionMade(self):
         """Handle connection establishment
@@ -100,6 +114,9 @@ class SSMIClient(protocol.Protocol):
         elif response_code == SSMI_RESPONSE_USSD:
             msisdn, type, phase, message = response[2:6]
             if type == SSMI_USSD_TYPE_NEW:
+                # XXX Call a callback into the app with the message.
+                #     That must be able to call a callback into here
+                #     to send the response.
                 self.transport.write(
                     "%s,%s,%s,%s,%s\r" %
                     (SSMI_HEADER, SSMI_SEND_USSD,
@@ -140,20 +157,36 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = None
         print "Connection lost", reason
 
-class SSMIFactory(protocol.ClientFactory):
-    protocol = SSMIClient
+class SSMIFactory(protocol.ReconnectingClientFactory):
+    def __init__(self, username, password, callback=None, errback=None):
+        self.__username = username
+        self.__password = password
+        self.__callback = callback
+        self.__errback = errback
+
+    def startConnecting(self, connector):
+        print 'Started to connect.'
+
+    def buildProtocol(self, addr):
+        print 'Connected.'
+        print 'Resetting reconnection delay'
+        self.resetDelay()
+        return SSMIClient(self.__username, self.__password, self.__callback,
+                          self.__errback)
 
     def clientConnectionFailed(self, connector, reason):
         print "Connection failed", reason
-        reactor.stop()
+        protocol.ReconnectingClientFactory.clientConnectionFailed(
+            self, connector, reason)
 
     def clientConnectionLost(self, connector, reason):
         print "Connection lost", reason
-        reactor.stop()
+        protocol.ReconnectingClientFactory.clientConnectionLost(
+            self, connector, reason)
 
 
 def main():
-    f = SSMIFactory()
+    f = SSMIFactory(username=USERNAME, password=PASSWORD)
     reactor.connectTCP(HOSTNAME, PORT, f)
     reactor.run()
 

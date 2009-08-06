@@ -1,0 +1,4 @@
+Handle failure of response to linkcheck
+ - if two linkchecks don't reply, disconnect
+
+

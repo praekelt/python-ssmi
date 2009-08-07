@@ -100,6 +100,9 @@ class SSMIClient(protocol.Protocol):
         print "Server said:", data
         response = data.strip().split(',')
         # assumption: response[0] == SSMI_HEADER
+        if not response[0] == SSMI_HEADER:
+            print 'FAIL: No SSMI header. Aborting'
+            reactor.stop()
         response_code = response[1]
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]

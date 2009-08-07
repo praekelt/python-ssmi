@@ -113,25 +113,20 @@ class SSMIClient(protocol.Protocol):
         elif response_code == SSMI_RESPONSE_USSD:
             msisdn, type, phase, message = response[2:6]
             if type == SSMI_USSD_TYPE_NEW:
-                # XXX Call a callback into the app with the message.
-                #     That must be able to call a callback into here
-                #     to send the response.
-                self.transport.write(
-                    "%s,%s,%s,%s,%s\r" %
-                    (SSMI_HEADER, SSMI_SEND_USSD,
-                     msisdn, SSMI_USSD_TYPE_EXISTING,
-                     "Welcome\n1.Main Menu\n2.Cool stuff\nMore..."))
+                print 'New session'
             elif type == SSMI_USSD_TYPE_EXISTING:
-                print 'XXX'
-                self.transport.write(
-                    "%s,%s,%s,%s,%s\r" %
-                    (SSMI_HEADER, SSMI_SEND_USSD,
-                     msisdn, SSMI_USSD_TYPE_EXISTING,
-                     "Hello again\n1.Main Menu\n2.Cool stuff\nMore..."))
+                print 'Existing session'
             elif type == SSMI_USSD_TYPE_END:
                 print 'END'
             elif type == SSMI_USSD_TYPE_TIMEOUT:
                 print 'TIMEOUT'
+            # Call a callback into the app with the message.
+            reply = self.callback(msisdn, type, phase, message)
+            if reply:
+                self.transport.write(
+                    "%s,%s,%s,%s,%s\r" %
+                    (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                     SSMI_USSD_TYPE_EXISTING, reply))
 
 
 # SSMI_RESPONSE_SEQ = "100"

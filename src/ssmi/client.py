@@ -126,7 +126,7 @@ class SSMIClient(protocol.Protocol):
                 self.transport.write(
                     "%s,%s,%s,%s,%s\r" %
                     (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                     SSMI_USSD_TYPE_EXISTING, reply))
+                     SSMI_USSD_TYPE_EXISTING, str(reply)))
 
 
 # SSMI_RESPONSE_SEQ = "100"

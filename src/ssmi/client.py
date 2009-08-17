@@ -58,7 +58,7 @@ nack_reason = {
     "1": "Invalid username/password combination",
     "2": "Invalid/unknown message type",
     "3": "Could not parse message",
-    "4": "Account suspended",
+    "4": "Account suspended (non-payment or abuse)",
 }
 
 class SSMIClient(protocol.Protocol):

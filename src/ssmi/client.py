@@ -46,6 +46,8 @@ SSMI_USSD_TYPE_NEW = "1"
 SSMI_USSD_TYPE_EXISTING = "2"
 SSMI_USSD_TYPE_END = "3"
 SSMI_USSD_TYPE_TIMEOUT = "4"
+SSMI_USSD_TYPE_REDIRECT = "5"
+SSMI_USSD_TYPE_NI = "6"
 
 ack_reason = {
     "1": "Login OK",
@@ -111,22 +113,40 @@ class SSMIClient(protocol.Protocol):
             reason = response[2]
             print 'NACK', nack_reason[reason]
         elif response_code == SSMI_RESPONSE_USSD:
-            msisdn, type, phase, message = response[2:6]
-            if type == SSMI_USSD_TYPE_NEW:
+            msisdn, ussd_type, phase, message = response[2:6]
+            if ussd_type == SSMI_USSD_TYPE_NEW:
                 print 'New session'
-            elif type == SSMI_USSD_TYPE_EXISTING:
+            elif ussd_type == SSMI_USSD_TYPE_EXISTING:
                 print 'Existing session'
-            elif type == SSMI_USSD_TYPE_END:
-                print 'END'
-            elif type == SSMI_USSD_TYPE_TIMEOUT:
-                print 'TIMEOUT'
+            elif ussd_type == SSMI_USSD_TYPE_END:
+                print 'End of session'
+            elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
+                print 'Timeout'
             # Call a callback into the app with the message.
-            reply = self.callback(msisdn, type, phase, message)
+            reply = self.callback(msisdn, ussd_type, phase, message)
             if reply:
-                self.transport.write(
-                    "%s,%s,%s,%s,%s\r" %
-                    (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                     SSMI_USSD_TYPE_EXISTING, str(reply)))
+                if type(reply) == type(''):
+                    self.transport.write(
+                        "%s,%s,%s,%s,%s\r" %
+                        (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                         SSMI_USSD_TYPE_EXISTING, str(reply)))
+                elif type(reply) == type(()):
+                    try:
+                        message, ussd_type = reply  # unpack tuple
+                    except:
+                        print 'BAD RESPONSE FROM CALLBACK: %r' % reply
+                        return
+                    if ussd_type not in [SSMI_USSD_TYPE_EXISTING,
+                                         SSMI_USSD_TYPE_END,
+                                         SSMI_USSD_TYPE_REDIRECT,
+                                         SSMI_USSD_TYPE_NI]:
+                        print 'BAD USSD_TYPE FROM CALLBACK: %r' % ussd_type
+                        return
+                    self.transport.write(
+                        "%s,%s,%s,%s,%s\r" %
+                        (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                         ussd_type, str(message)))
+
 
 
 # SSMI_RESPONSE_SEQ = "100"

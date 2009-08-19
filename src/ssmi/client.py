@@ -12,11 +12,6 @@ from twisted.internet import reactor, protocol
 
 # Constants
 
-HOSTNAME = 'connect.truteq.com'
-PORT = 40017
-USERNAME = 'praekelt'
-PASSWORD = 'morgan'
-
 LINKCHECK_PERIOD = 60.0
 
 SSMI_HEADER = "SSMI"
@@ -175,10 +170,13 @@ class SSMIClient(protocol.Protocol):
                         "%s,%s,%s,%s,%s\r" %
                         (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
                          ussd_type, str(message)))
-        #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE:
-        #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE:
-        #elif response_code == SSMI_RESPONSE_SEQ:
-
+        #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
+        #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE
+        #elif response_code == SSMI_RESPONSE_SEQ
+        elif response_code == SSMI_RESPONSE_REMOTE_LOGOUT:
+            ip = response[2]
+            print 'REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip
+            self.transport.loseConnection()
 
 
 # SSMI_RESPONSE_SEQ = "100"
@@ -258,12 +256,3 @@ class SSMIFactory(protocol.ReconnectingClientFactory):
         print "Connection lost", reason
         protocol.ReconnectingClientFactory.clientConnectionLost(
             self, connector, reason)
-
-
-def main():
-    f = SSMIFactory(username=USERNAME, password=PASSWORD)
-    reactor.connectTCP(HOSTNAME, PORT, f)
-    reactor.run()
-
-if __name__ == '__main__':
-    main()

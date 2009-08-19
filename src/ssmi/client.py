@@ -62,37 +62,44 @@ nack_reason = {
 class SSMIClient(protocol.Protocol):
     """Client for SSMI"""
 
-    def __init__(self, username, password, ussd_callback=None,
-                 sms_callback=None, sms_register_callback=None, errback=None):
+    def __init__(self, app_register_callback=None):
         """init SSMIClient.
+
+        app_register_callback: lambda: callback for setup
+          -- this callback should call back again to
+             self.app_setup to set username, password,
+             and other callbacks.
+        """
+        self._link_check_pending = 0
+        if app_register_callback and type(
+            app_register_callback)==type(lambda: 1):
+            # register protocol with app
+            app_register_callback(self)
+        print 'SSMIClient init'
+
+    def app_setup(self, username, password, ussd_callback=None,
+                  sms_callback=None, errback=None):
+        """Set up application callbacks to handle receiving USSD or SMS.
 
         username: string -- username for SSMI service
         password: string -- password for SSMI service
         ussd_callback: lambda -- callback for data received
         sms_callback: lambda -- callback for SMS received
-        sms_register_callback: lambda: callback for setup for SMS sending
         errback: lambda -- callback for error handling
-
         """
         self._username = username
         self._password = password
         self._ussd_callback = ussd_callback
         self._sms_callback = sms_callback
-        self._sms_register_callback = sms_register_callback
         self._errback = errback  # WHUI
-        self._link_check_pending = 0
-        if self._sms_register_callback and type(
-            self._sms_register_callback)==type(lambda: 1):
-            # register sms sending lambda with app
-            self._sms_register_callback(self.send_sms)
-        print 'ran SSMIClient init'
+        print 'SSMIClient app_setup done'
 
     def connectionMade(self):
         """Handle connection establishment
 
         Log in
         """
-        print 'logging in'
+        print 'SSMIClient logging in'
         self.transport.write("%s,%s,%s,%s\r" % (SSMI_HEADER,
                                                 SSMI_SEND_LOGIN,
                                                 self._username,
@@ -100,10 +107,10 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def linkcheck(self):
-        print "linkcheck: ", time.time()
+        print "SSMIClient linkcheck: ", time.time()
         self.updateCall = None
         if self._link_check_pending == 3:
-            print 'Link check not acked 3 times, disconnecting'
+            print 'SSMIClient Link check not acked 3 times, disconnecting'
             self.transport.loseConnection()
             return
         self.transport.write("%s,%s\r" % (SSMI_HEADER,
@@ -112,60 +119,53 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def dataReceived(self, data):
-        print "Server said:", data
+        print "SSMIClient Server said:", data
         response = data.strip().split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
-            print 'FAIL: No SSMI header. Aborting'
+            print 'SSMIClient FAIL: No SSMI header. Aborting'
             reactor.stop()
         response_code = response[1]
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]
-            print 'ACK', ack_reason[reason]
+            print 'SSMIClient ACK', ack_reason[reason]
             if reason == "2":
                 # Link check acked
                 self._link_check_pending = 0
-                print 'Link check acked, resetting pending count'
         elif response_code == SSMI_RESPONSE_NACK:
             reason = response[2]
-            print 'NACK', nack_reason[reason]
+            print 'SSMIClient NACK', nack_reason[reason]
         elif response_code == SSMI_RESPONSE_USSD:
             msisdn, ussd_type, phase, message = response[2:6]
             if ussd_type == SSMI_USSD_TYPE_NEW:
-                print 'New session'
+                print 'SSMIClient New session'
             elif ussd_type == SSMI_USSD_TYPE_EXISTING:
-                print 'Existing session'
+                print 'SSMIClient Existing session'
             elif ussd_type == SSMI_USSD_TYPE_END:
-                print 'End of session'
+                print 'SSMIClient End of session'
             elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
-                print 'TIMEOUT'
+                print 'SSMIClient TIMEOUT'
             # Call a callback into the app with the message.
-            print 'python-ssmi: calling _ussd_callback'
+            print 'SSMIClient calling _ussd_callback'
             reply = self._ussd_callback(msisdn, ussd_type, phase, message)
             if reply:
-                print 'GOT REPLY FROM CALLBACK: %r' % reply
                 if type(reply) in StringTypes:
-                    print 'STRING REPLY'
                     self.transport.write(
                         "%s,%s,%s,%s,%s\r" %
                         (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
                          SSMI_USSD_TYPE_EXISTING, str(reply)))
                 elif type(reply) == type(()):
-                    print 'TUPLE REPLY'
                     try:
                         message, ussd_type = reply  # unpack tuple
-                        print 'TUPLE UNPACKED. message: %s, type: %s' % (
-                            message, ussd_type)
                     except:
-                        print 'BAD RESPONSE FROM ussd_CALLBACK: %r' % reply
+                        print 'SSMIClient BAD RESPONSE FROM ussd_CALLBACK: %r' % reply
                         return
                     if ussd_type not in [SSMI_USSD_TYPE_EXISTING,
                                          SSMI_USSD_TYPE_END,
                                          SSMI_USSD_TYPE_REDIRECT,
                                          SSMI_USSD_TYPE_NI]:
-                        print 'BAD USSD_TYPE FROM ussd_CALLBACK: %r' % ussd_type
+                        print 'SSMIClient BAD USSD_TYPE FROM ussd_CALLBACK: %r' % ussd_type
                         return
-                    print 'OK, WRITING USSD RESPONSE WITH %s TYPE' % ussd_type
                     self.transport.write(
                         "%s,%s,%s,%s,%s\r" %
                         (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
@@ -175,7 +175,7 @@ class SSMIClient(protocol.Protocol):
         #elif response_code == SSMI_RESPONSE_SEQ
         elif response_code == SSMI_RESPONSE_REMOTE_LOGOUT:
             ip = response[2]
-            print 'REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip
+            print 'SSMIClient REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip
             self.transport.loseConnection()
 
 
@@ -199,7 +199,7 @@ class SSMIClient(protocol.Protocol):
         if self.updateCall:
             self.updateCall.cancel()
         self.updateCall = None
-        print "Connection lost", reason
+        print "SSMIClient Connection lost", reason
 
     def send_sms(self, msisdn, message, validity=0):
         """Send SMS.
@@ -215,44 +215,28 @@ class SSMIClient(protocol.Protocol):
 
 
 class SSMIFactory(protocol.ReconnectingClientFactory):
-    def __init__(self, username, password, ussd_callback=None,
-                 sms_callback=None, sms_register_callback=None, errback=None):
+    def __init__(self, app_register_callback=None):
         """init SSMIFactory.
 
-        username: string -- username for SSMI service
-        password: string -- password for SSMI service
-        ussd_callback: lambda -- callback for data received
-        sms_callback: lambda -- callback for SMS received
-        sms_register_callback: lambda: callback for setup for SMS sending
-        errback: lambda -- callback for error handling
-
+        app_register_callback: lambda: callback for setup
         """
-        self._username = username
-        self._password = password
-        self._ussd_callback = ussd_callback
-        self._sms_callback = sms_callback
-        self._sms_register_callback = sms_register_callback
-        self._errback = errback
+        self._app_register_callback = app_register_callback
 
     def startConnecting(self, connector):
-        print 'Started to connect.'
+        print 'SSMIFactory Started to connect.'
 
     def buildProtocol(self, addr):
-        print 'Connected.'
-        print 'Resetting reconnection delay'
+        print 'SSMIFactory Connected.'
+        print 'SSMIFactory Resetting reconnection delay'
         self.resetDelay()
-        return SSMIClient(self._username, self._password,
-                          ussd_callback=self._ussd_callback,
-                          sms_callback=self._sms_callback,
-                          sms_register_callback=self._sms_register_callback,
-                          errback=self._errback)
+        return SSMIClient(app_register_callback=self._app_register_callback)
 
     def clientConnectionFailed(self, connector, reason):
-        print "Connection failed", reason
+        print "SSMIFactory Connection failed", reason
         protocol.ReconnectingClientFactory.clientConnectionFailed(
             self, connector, reason)
 
     def clientConnectionLost(self, connector, reason):
-        print "Connection lost", reason
+        print "SSMIFactory Connection lost", reason
         protocol.ReconnectingClientFactory.clientConnectionLost(
             self, connector, reason)

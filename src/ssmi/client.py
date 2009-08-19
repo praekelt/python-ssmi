@@ -82,6 +82,7 @@ class SSMIClient(protocol.Protocol):
         self._sms_callback = sms_callback
         self._sms_register_callback = sms_register_callback
         self._errback = errback  # WHUI
+        self._link_check_pending = 0
         if self._sms_register_callback and type(
             self._sms_register_callback)==type(lambda: 1):
             # register sms sending lambda with app
@@ -99,12 +100,18 @@ class SSMIClient(protocol.Protocol):
                                                 self._username,
                                                 self._password))
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
+        self.updateCall2 = reactor.callLater(20, self.transport.loseConnection)
 
     def linkcheck(self):
         print "linkcheck: ", time.time()
         self.updateCall = None
+        if self._link_check_pending == 3:
+            print 'Link check not acked 3 times, disconnecting'
+            self.transport.loseConnection()
+            return
         self.transport.write("%s,%s\r" % (SSMI_HEADER,
                                           SSMI_SEND_LINK_CHECK))
+        self._link_check_pending = self._link_check_pending + 1
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def dataReceived(self, data):
@@ -118,6 +125,10 @@ class SSMIClient(protocol.Protocol):
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]
             print 'ACK', ack_reason[reason]
+            if reason == "2":
+                # Link check acked
+                self._link_check_pending = 0
+                print 'Link check acked, resetting pending count'
         elif response_code == SSMI_RESPONSE_NACK:
             reason = response[2]
             print 'NACK', nack_reason[reason]

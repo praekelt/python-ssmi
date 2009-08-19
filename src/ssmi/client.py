@@ -100,7 +100,6 @@ class SSMIClient(protocol.Protocol):
                                                 self._username,
                                                 self._password))
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
-        self.updateCall2 = reactor.callLater(20, self.transport.loseConnection)
 
     def linkcheck(self):
         print "linkcheck: ", time.time()

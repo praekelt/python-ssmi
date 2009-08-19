@@ -4,8 +4,11 @@
 
 # Imports
 
-from twisted.internet import reactor, protocol
 import time
+from types import StringTypes
+
+from twisted.internet import reactor, protocol
+
 
 # Constants
 
@@ -142,16 +145,22 @@ class SSMIClient(protocol.Protocol):
             elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
                 print 'TIMEOUT'
             # Call a callback into the app with the message.
+            print 'python-ssmi: calling _ussd_callback'
             reply = self._ussd_callback(msisdn, ussd_type, phase, message)
             if reply:
-                if type(reply) == type(''):
+                print 'GOT REPLY FROM CALLBACK: %r' % reply
+                if type(reply) in StringTypes:
+                    print 'STRING REPLY'
                     self.transport.write(
                         "%s,%s,%s,%s,%s\r" %
                         (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
                          SSMI_USSD_TYPE_EXISTING, str(reply)))
                 elif type(reply) == type(()):
+                    print 'TUPLE REPLY'
                     try:
                         message, ussd_type = reply  # unpack tuple
+                        print 'TUPLE UNPACKED. message: %s, type: %s' % (
+                            message, ussd_type)
                     except:
                         print 'BAD RESPONSE FROM ussd_CALLBACK: %r' % reply
                         return
@@ -161,6 +170,7 @@ class SSMIClient(protocol.Protocol):
                                          SSMI_USSD_TYPE_NI]:
                         print 'BAD USSD_TYPE FROM ussd_CALLBACK: %r' % ussd_type
                         return
+                    print 'OK, WRITING USSD RESPONSE WITH %s TYPE' % ussd_type
                     self.transport.write(
                         "%s,%s,%s,%s,%s\r" %
                         (SSMI_HEADER, SSMI_SEND_USSD, msisdn,

@@ -22,6 +22,7 @@ SSMI_SEND_LINK_CHECK = "3"
 SSMI_SEND_BINARY = "4"
 SSMI_SEND_LOGOUT = "99"
 SSMI_SEND_USSD = "110"
+SSMI_SEND_WAP_PUSH = "112"
 
 SSMI_RESPONSE_SEQ = "100"
 SSMI_RESPONSE_ACK = "101"
@@ -212,6 +213,18 @@ class SSMIClient(protocol.Protocol):
             "%s,%s,%s,%s,%s\r" %
             (SSMI_HEADER, SSMI_SEND_SMS, str(validity), str(msisdn),
              str(message)))
+
+    def send_wap_push(self, msisdn, subject, url):
+        """Send a WAP Push.
+
+        msisdn: string -- cellphone number of recipient
+        subject: string -- subject displayed to subscriber
+        url: string -- url to be sent to subscriber
+        """
+        self.transport.write(
+            "%s,%s,%s,%s,%s\r" %
+            (SSMI_HEADER, SSMI_SEND_WAP_PUSH, str(msisdn),
+             str(subject), str(url)))
 
 
 class SSMIFactory(protocol.ReconnectingClientFactory):

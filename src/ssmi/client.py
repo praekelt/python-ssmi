@@ -148,29 +148,8 @@ class SSMIClient(protocol.Protocol):
                 print 'SSMIClient TIMEOUT'
             # Call a callback into the app with the message.
             print 'SSMIClient calling _ussd_callback'
-            reply = self._ussd_callback(msisdn, ussd_type, phase, message)
-            if reply:
-                if type(reply) in StringTypes:
-                    self.transport.write(
-                        "%s,%s,%s,%s,%s\r" %
-                        (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                         SSMI_USSD_TYPE_EXISTING, str(reply)))
-                elif type(reply) == type(()):
-                    try:
-                        message, ussd_type = reply  # unpack tuple
-                    except:
-                        print 'SSMIClient BAD RESPONSE FROM ussd_CALLBACK: %r' % reply
-                        return
-                    if ussd_type not in [SSMI_USSD_TYPE_EXISTING,
-                                         SSMI_USSD_TYPE_END,
-                                         SSMI_USSD_TYPE_REDIRECT,
-                                         SSMI_USSD_TYPE_NI]:
-                        print 'SSMIClient BAD USSD_TYPE FROM ussd_CALLBACK: %r' % ussd_type
-                        return
-                    self.transport.write(
-                        "%s,%s,%s,%s,%s\r" %
-                        (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                         ussd_type, str(message)))
+            if self._ussd_callback is not None:
+                self._ussd_callback(msisdn, ussd_type, phase, message)
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
         #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE
         #elif response_code == SSMI_RESPONSE_SEQ
@@ -201,6 +180,25 @@ class SSMIClient(protocol.Protocol):
             self.updateCall.cancel()
         self.updateCall = None
         print "SSMIClient Connection lost", reason
+
+    def send_ussd(self, msisdn, message, ussd_type=SSMI_USSD_TYPE_EXISTING):
+        """Send USSD.
+
+        msisdn: string -- cellphone number of recipient
+        message: string -- message content
+        ussd_type: type of SSMI reply
+        """
+        if ussd_type not in [SSMI_USSD_TYPE_EXISTING, SSMI_USSD_TYPE_END,
+                             SSMI_USSD_TYPE_REDIRECT, SSMI_USSD_TYPE_NI]:
+            print 'SSMIClient send_ussd bad ussd_type: %r' % ussd_type
+            return
+        if not type(message) in StringTypes:
+            print 'SSMIClient send_ussd bad message type: %r' % message
+            return
+        self.transport.write(
+            "%s,%s,%s,%s,%s\r" %
+            (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+             ussd_type, str(message)))
 
     def send_sms(self, msisdn, message, validity=0):
         """Send SMS.

@@ -110,8 +110,8 @@ class SSMIClient(protocol.Protocol):
     def linkcheck(self):
         print "SSMIClient linkcheck: ", time.time()
         self.updateCall = None
-        if self._link_check_pending == 3:
-            print 'SSMIClient Link check not acked 3 times, disconnecting'
+        if self._link_check_pending == 2:
+            print 'SSMIClient Link check not acked 2 times, disconnecting'
             self.transport.loseConnection()
             return
         self.transport.write("%s,%s\r" % (SSMI_HEADER,

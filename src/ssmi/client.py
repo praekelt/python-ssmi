@@ -76,7 +76,6 @@ class SSMIClient(protocol.Protocol):
             app_register_callback)==type(lambda: 1):
             # register protocol with app
             app_register_callback(self)
-        print 'SSMIClient init'
 
     def app_setup(self, username, password, ussd_callback=None,
                   sms_callback=None, errback=None):
@@ -120,7 +119,7 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def dataReceived(self, data):
-        print "SSMIClient Server said:", data
+        print "SSMIClient RECV USSD:", data
         response = data.strip().split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
@@ -139,15 +138,16 @@ class SSMIClient(protocol.Protocol):
         elif response_code == SSMI_RESPONSE_USSD:
             msisdn, ussd_type, phase, message = response[2:6]
             if ussd_type == SSMI_USSD_TYPE_NEW:
-                print 'SSMIClient New session'
+                #print 'SSMIClient New session'
+                pass
             elif ussd_type == SSMI_USSD_TYPE_EXISTING:
-                print 'SSMIClient Existing session'
+                #print 'SSMIClient Existing session'
+                pass
             elif ussd_type == SSMI_USSD_TYPE_END:
                 print 'SSMIClient End of session'
             elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
                 print 'SSMIClient TIMEOUT'
             # Call a callback into the app with the message.
-            print 'SSMIClient calling _ussd_callback'
             if self._ussd_callback is not None:
                 self._ussd_callback(msisdn, ussd_type, phase, message)
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE

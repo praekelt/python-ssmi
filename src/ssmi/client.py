@@ -8,6 +8,7 @@ import time
 from types import StringTypes
 
 from twisted.internet import reactor, protocol
+from twisted.python import log
 
 
 # Constants
@@ -60,6 +61,16 @@ nack_reason = {
     "4": "Account suspended (non-payment or abuse)",
 }
 
+# global status
+
+DEBUG = False
+
+def set_debug(debug):
+    """Set global DEBUG flag."""
+    global DEBUG
+    if debug:
+        DEBUG = True
+
 class SSMIClient(protocol.Protocol):
     """Client for SSMI"""
 
@@ -92,14 +103,16 @@ class SSMIClient(protocol.Protocol):
         self._ussd_callback = ussd_callback
         self._sms_callback = sms_callback
         self._errback = errback  # WHUI
-        print 'SSMIClient app_setup done'
+        if DEBUG:
+            log.msg('SSMIClient app_setup done')
 
     def connectionMade(self):
         """Handle connection establishment
 
         Log in
         """
-        print 'SSMIClient logging in'
+        if DEBUG:
+            log.msg('SSMIClient logging in')
         self.transport.write("%s,%s,%s,%s\r" % (SSMI_HEADER,
                                                 SSMI_SEND_LOGIN,
                                                 self._username,
@@ -107,10 +120,11 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def linkcheck(self):
-        print "SSMIClient linkcheck: ", time.time()
+        if DEBUG:
+            log.msg("SSMIClient linkcheck")
         self.updateCall = None
         if self._link_check_pending == 2:
-            print 'SSMIClient Link check not acked 2 times, disconnecting'
+            log.msg('SSMIClient Link check not acked 2 times, disconnecting')
             self.transport.loseConnection()
             return
         self.transport.write("%s,%s\r" % (SSMI_HEADER,
@@ -119,34 +133,35 @@ class SSMIClient(protocol.Protocol):
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def dataReceived(self, data):
-        print "SSMIClient RECV USSD:", data
+        log.msg("SSMIClient RECV USSD: %s" % data)
         response = data.strip().split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
-            print 'SSMIClient FAIL: No SSMI header. Aborting'
+            log.msg('SSMIClient FAIL: No SSMI header. Aborting')
             reactor.stop()
         response_code = response[1]
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]
-            print 'SSMIClient ACK', ack_reason[reason]
+            if DEBUG:
+                log.msg('SSMIClient ACK %s' % ack_reason[reason])
             if reason == "2":
                 # Link check acked
                 self._link_check_pending = 0
         elif response_code == SSMI_RESPONSE_NACK:
             reason = response[2]
-            print 'SSMIClient NACK', nack_reason[reason]
+            log.msg('SSMIClient NACK %s' % nack_reason[reason])
         elif response_code == SSMI_RESPONSE_USSD:
             msisdn, ussd_type, phase, message = response[2:6]
             if ussd_type == SSMI_USSD_TYPE_NEW:
-                #print 'SSMIClient New session'
-                pass
+                if DEBUG:
+                    log.msg('SSMIClient New session')
             elif ussd_type == SSMI_USSD_TYPE_EXISTING:
-                #print 'SSMIClient Existing session'
-                pass
+                if DEBUG:
+                    log.msg('SSMIClient Existing session')
             elif ussd_type == SSMI_USSD_TYPE_END:
-                print 'SSMIClient End of session'
+                log.msg('SSMIClient End of session')
             elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
-                print 'SSMIClient TIMEOUT'
+                log.msg('SSMIClient TIMEOUT')
             # Call a callback into the app with the message.
             if self._ussd_callback is not None:
                 self._ussd_callback(msisdn, ussd_type, phase, message)
@@ -155,7 +170,8 @@ class SSMIClient(protocol.Protocol):
         #elif response_code == SSMI_RESPONSE_SEQ
         elif response_code == SSMI_RESPONSE_REMOTE_LOGOUT:
             ip = response[2]
-            print 'SSMIClient REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip
+            log.msg(
+                'SSMIClient REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip)
             self.transport.loseConnection()
 
 
@@ -166,20 +182,18 @@ class SSMIClient(protocol.Protocol):
 # SSMI_RESPONSE_BINARY_MESSAGE = "106"
 # SSMI_RESPONSE_PREMIUMRATED_MESSAGE = "107"
 # SSMI_RESPONSE_BINARY_PREMIUMRATED_MESSAGE = "108"
-# SSMI_RESPONSE_USSD = "110"
 # SSMI_RESPONSE_USSD_EXTENDED = "111"
 # SSMI_RESPONSE_EXTENDED_RETURN = "113"
 # SSMI_RESPONSE_EXTENDED_RETURN_BINARY = "116"
 # SSMI_RESPONSE_EXTENDED_PREMIUMRATED_MESSAGE = "117"
 # SSMI_RESPONSE_EXTENDED_BINARY_PREMIUMRATED_MESSAGE = "118"
-# SSMI_RESPONSE_REMOTE_LOGOUT = "199"
 
 
     def connectionLost(self, reason):
         if self.updateCall:
             self.updateCall.cancel()
         self.updateCall = None
-        print "SSMIClient Connection lost", reason
+        log.msg("SSMIClient Connection lost: %s" % reason)
 
     def send_ussd(self, msisdn, message, ussd_type=SSMI_USSD_TYPE_EXISTING):
         """Send USSD.
@@ -190,15 +204,15 @@ class SSMIClient(protocol.Protocol):
         """
         if ussd_type not in [SSMI_USSD_TYPE_EXISTING, SSMI_USSD_TYPE_END,
                              SSMI_USSD_TYPE_REDIRECT, SSMI_USSD_TYPE_NI]:
-            print 'SSMIClient send_ussd bad ussd_type: %r' % ussd_type
+            log.msg('SSMIClient send_ussd bad ussd_type: %r' % ussd_type)
             return
         if not type(message) in StringTypes:
-            print 'SSMIClient send_ussd bad message type: %r' % message
+            log.msg('SSMIClient send_ussd bad message type: %r' % message)
             return
-        self.transport.write(
-            "%s,%s,%s,%s,%s\r" %
-            (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-             ussd_type, str(message)))
+        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                                     ussd_type, str(message))
+        self.transport.write(data)
+        log.msg('SSMIClient SEND USSD: %s' % '_'.join(data.split('\n')))
 
     def send_sms(self, msisdn, message, validity=0):
         """Send SMS.
@@ -207,10 +221,10 @@ class SSMIClient(protocol.Protocol):
         message: string(160) -- message content
         validity: integer -- validity in minutes, default 0 for a week
         """
-        self.transport.write(
-            "%s,%s,%s,%s,%s\r" %
-            (SSMI_HEADER, SSMI_SEND_SMS, str(validity), str(msisdn),
-             str(message)))
+        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_SMS,
+                                     str(validity), str(msisdn), str(message))
+        self.transport.write(data)
+        log.msg('SSMIClient SEND SMS: %s' % data)
 
     def send_wap_push(self, msisdn, subject, url):
         """Send a WAP Push.
@@ -219,10 +233,10 @@ class SSMIClient(protocol.Protocol):
         subject: string -- subject displayed to subscriber
         url: string -- url to be sent to subscriber
         """
-        self.transport.write(
-            "%s,%s,%s,%s,%s\r" %
-            (SSMI_HEADER, SSMI_SEND_WAP_PUSH, str(msisdn),
-             str(subject), str(url)))
+        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_WAP_PUSH,
+                                     str(msisdn), str(subject), str(url))
+        self.transport.write(data)
+        log.msg('SSMIClient SEND WAP PUSH: %s' % data)
 
 
 class SSMIFactory(protocol.ReconnectingClientFactory):
@@ -234,20 +248,22 @@ class SSMIFactory(protocol.ReconnectingClientFactory):
         self._app_register_callback = app_register_callback
 
     def startConnecting(self, connector):
-        print 'SSMIFactory Started to connect.'
+        if DEBUG:
+            log.msg('SSMIFactory Started to connect.')
 
     def buildProtocol(self, addr):
-        print 'SSMIFactory Connected.'
-        print 'SSMIFactory Resetting reconnection delay'
+        if DEBUG:
+            log.msg('SSMIFactory Connected.')
+            log.msg('SSMIFactory Resetting reconnection delay')
         self.resetDelay()
         return SSMIClient(app_register_callback=self._app_register_callback)
 
     def clientConnectionFailed(self, connector, reason):
-        print "SSMIFactory Connection failed", reason
+        log.msg("SSMIFactory Connection failed: %s" % reason)
         protocol.ReconnectingClientFactory.clientConnectionFailed(
             self, connector, reason)
 
     def clientConnectionLost(self, connector, reason):
-        print "SSMIFactory Connection lost", reason
+        log.msg("SSMIFactory Connection lost: %s" % reason)
         protocol.ReconnectingClientFactory.clientConnectionLost(
             self, connector, reason)

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
         name = "python-ssmi",
-        version = "0.0.3",
+        version = "0.0.4",
         url = 'http://github.com/praekelt/python-ssmi',
         license = 'proprietary',
         description = "Python module implementing SSMI for USSD and SMS.",

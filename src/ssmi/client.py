@@ -132,6 +132,19 @@ class SSMIClient(protocol.Protocol):
         self._link_check_pending = self._link_check_pending + 1
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
+    def parseGenfield(self, genfield):
+        genarray = genfield.split(":")
+        # pad the array to ensure enough elements
+        genarray += ['', '', '', '', '']
+        genfields = {
+            'IMSI': genarray[0],
+            'Subscriber type': genarray[1],
+            'OperatorID': genarray[2],
+            'SessionID': genarray[3],
+            'ValiPort': genarray[4],
+        }
+        return genfields
+
     def dataReceived(self, data):
         log.msg("SSMIClient RECV USSD: %s" % data)
         response = data.strip().split(',')
@@ -180,7 +193,8 @@ class SSMIClient(protocol.Protocol):
                 log.msg('SSMIClient TIMEOUT')
             # Call a callback into the app with the message.
             if self._ussd_callback is not None:
-                self._ussd_callback(msisdn, ussd_type, phase, message, genfield)
+                self._ussd_callback(msisdn, ussd_type, phase, message,
+                                                self.parseGenfield(genfield))
 
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
         #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE

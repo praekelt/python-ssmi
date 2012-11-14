@@ -20,10 +20,10 @@ class SSMIClientTestCase(TestCase):
         if genfields is None:
             genfields = {}
         self.callback_populated_list.append({
-            "msisdn": '27831112222',
-            "ussd_type": '1',
-            "phase": '0',
-            "message": '*156#<cr>',
+            "msisdn": msisdn,
+            "ussd_type": ussd_type,
+            "phase": phase,
+            "message": message,
             "genfields": genfields})
 
     def test_dataRecieved_111(self):

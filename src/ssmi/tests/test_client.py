@@ -15,7 +15,8 @@ class SSMIClientTestCase(TestCase):
                 None,
                 None)
 
-    def ussd_test_callback(self, msisdn, ussd_type, phase, message, genfields=None):
+    def ussd_test_callback(self, msisdn, ussd_type, phase, message,
+                                                    genfields=None):
         if genfields is None:
             genfields = {}
         self.callback_populated_list.append({
@@ -26,7 +27,8 @@ class SSMIClientTestCase(TestCase):
             "genfields": genfields})
 
     def test_dataRecieved_111(self):
-        self.ssmi_client.dataReceived('SSMI,111,27831112222,1,0,655011234567890:1::,*156#<cr>')
+        self.ssmi_client.dataReceived(
+                'SSMI,111,27831112222,1,0,655011234567890:1::,*156#<cr>')
         self.assertTrue(len(self.callback_populated_list) > 0)
         list_0 = self.callback_populated_list[0]
         self.assertEqual(list_0['msisdn'], '27831112222')
@@ -39,7 +41,6 @@ class SSMIClientTestCase(TestCase):
         self.assertEqual(genfields['OperatorID'], '')
         self.assertEqual(genfields['SessionID'], '')
         self.assertEqual(genfields['ValiPort'], '')
-
 
     def test_dataRecieved_110(self):
         self.ssmi_client.dataReceived('SSMI,110,27831112222,1,0,*156#<cr>')

@@ -132,6 +132,22 @@ class SSMIClient(protocol.Protocol):
         self._link_check_pending = self._link_check_pending + 1
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
+    def parseGenfield(self, genfield):
+        genarray = genfield.split(":")
+        # pad the array to ensure enough elements
+        # in theory we should have the five sub-params listed below
+        # but in practice we may get '::::' (empty values)
+        # or even '::' (less than 5 values)
+        genarray += ['', '', '', '', '']
+        genfields = {
+            'IMSI': genarray[0],
+            'Subscriber type': genarray[1],
+            'OperatorID': genarray[2],
+            'SessionID': genarray[3],
+            'ValiPort': genarray[4],
+        }
+        return genfields
+
     def dataReceived(self, data):
         log.msg("SSMIClient RECV USSD: %s" % data)
         response = data.strip().split(',')
@@ -165,6 +181,24 @@ class SSMIClient(protocol.Protocol):
             # Call a callback into the app with the message.
             if self._ussd_callback is not None:
                 self._ussd_callback(msisdn, ussd_type, phase, message)
+
+        elif response_code == SSMI_RESPONSE_USSD_EXTENDED:
+            msisdn, ussd_type, phase, genfield, message = response[2:7]
+            if ussd_type == SSMI_USSD_TYPE_NEW:
+                if DEBUG:
+                    log.msg('SSMIClient New session')
+            elif ussd_type == SSMI_USSD_TYPE_EXISTING:
+                if DEBUG:
+                    log.msg('SSMIClient Existing session')
+            elif ussd_type == SSMI_USSD_TYPE_END:
+                log.msg('SSMIClient End of session')
+            elif ussd_type == SSMI_USSD_TYPE_TIMEOUT:
+                log.msg('SSMIClient TIMEOUT')
+            # Call a callback into the app with the message.
+            if self._ussd_callback is not None:
+                self._ussd_callback(msisdn, ussd_type, phase, message,
+                                                self.parseGenfield(genfield))
+
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
         #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE
         #elif response_code == SSMI_RESPONSE_SEQ

@@ -137,7 +137,7 @@ class SSMIClient(protocol.Protocol):
         # pad the array to ensure enough elements
         # in theory we should have the five sub-params listed below
         # but in practice we may get '::::' (empty values)
-        # or even '::' (less then 5 values
+        # or even '::' (less than 5 values)
         genarray += ['', '', '', '', '']
         genfields = {
             'IMSI': genarray[0],

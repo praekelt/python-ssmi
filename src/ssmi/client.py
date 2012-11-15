@@ -154,7 +154,7 @@ class SSMIClient(LineReceiver):
 
     def lineReceived(self, data):
         log.msg("SSMIClient RECV USSD: %s" % data)
-        response = data.strip().split(',')
+        response = data.split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
             log.msg('SSMIClient FAIL: No SSMI header. Aborting')

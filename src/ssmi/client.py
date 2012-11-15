@@ -10,7 +10,9 @@ from types import StringTypes
 from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor, protocol
 from twisted.python import log
+from twisted.python.failure import Failure
 
+from ssmi.errors import SSMIRemoteServerError
 
 # Constants
 
@@ -157,8 +159,9 @@ class SSMIClient(LineReceiver):
         response = data.split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
-            log.msg('SSMIClient FAIL: No SSMI header. Aborting')
-            reactor.stop()
+            log.err(Failure(SSMIRemoteServerError(
+                'No SSMI header. Skipping bad line %r' % data)))
+            return
         response_code = response[1]
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]

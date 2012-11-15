@@ -7,6 +7,7 @@
 import time
 from types import StringTypes
 
+from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor, protocol
 from twisted.python import log
 
@@ -71,8 +72,11 @@ def set_debug(debug):
     if debug:
         DEBUG = True
 
-class SSMIClient(protocol.Protocol):
+
+class SSMIClient(LineReceiver):
     """Client for SSMI"""
+
+    delimiter = '\r'
 
     def __init__(self, app_register_callback=None):
         """init SSMIClient.
@@ -113,10 +117,10 @@ class SSMIClient(protocol.Protocol):
         """
         if DEBUG:
             log.msg('SSMIClient logging in')
-        self.transport.write("%s,%s,%s,%s\r" % (SSMI_HEADER,
-                                                SSMI_SEND_LOGIN,
-                                                self._username,
-                                                self._password))
+        self.sendLine("%s,%s,%s,%s" % (SSMI_HEADER,
+                                       SSMI_SEND_LOGIN,
+                                       self._username,
+                                       self._password))
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
     def linkcheck(self):
@@ -127,8 +131,8 @@ class SSMIClient(protocol.Protocol):
             log.msg('SSMIClient Link check not acked 2 times, disconnecting')
             self.transport.loseConnection()
             return
-        self.transport.write("%s,%s\r" % (SSMI_HEADER,
-                                          SSMI_SEND_LINK_CHECK))
+        self.sendLine("%s,%s" % (SSMI_HEADER,
+                                 SSMI_SEND_LINK_CHECK))
         self._link_check_pending = self._link_check_pending + 1
         self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
 
@@ -148,9 +152,9 @@ class SSMIClient(protocol.Protocol):
         }
         return genfields
 
-    def dataReceived(self, data):
+    def lineReceived(self, data):
         log.msg("SSMIClient RECV USSD: %s" % data)
-        response = data.strip().split(',')
+        response = data.split(',')
         # assumption: response[0] == SSMI_HEADER
         if not response[0] == SSMI_HEADER:
             log.msg('SSMIClient FAIL: No SSMI header. Aborting')
@@ -243,9 +247,9 @@ class SSMIClient(protocol.Protocol):
         if not type(message) in StringTypes:
             log.msg('SSMIClient send_ussd bad message type: %r' % message)
             return
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                                     ussd_type, str(message))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                                   ussd_type, str(message))
+        self.sendLine(data)
         log.msg('SSMIClient SEND USSD: %s' % '_'.join(data.split('\n')))
 
     def send_sms(self, msisdn, message, validity=0):
@@ -255,9 +259,9 @@ class SSMIClient(protocol.Protocol):
         message: string(160) -- message content
         validity: integer -- validity in minutes, default 0 for a week
         """
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_SMS,
-                                     str(validity), str(msisdn), str(message))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_SMS,
+                                   str(validity), str(msisdn), str(message))
+        self.sendLine(data)
         log.msg('SSMIClient SEND SMS: %s' % data)
 
     def send_wap_push(self, msisdn, subject, url):
@@ -267,9 +271,9 @@ class SSMIClient(protocol.Protocol):
         subject: string -- subject displayed to subscriber
         url: string -- url to be sent to subscriber
         """
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_WAP_PUSH,
-                                     str(msisdn), str(subject), str(url))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_WAP_PUSH,
+                                   str(msisdn), str(subject), str(url))
+        self.sendLine(data)
         log.msg('SSMIClient SEND WAP PUSH: %s' % data)
 
 

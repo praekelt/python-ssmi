@@ -175,7 +175,8 @@ class SSMIClient(LineReceiver):
             reason = response[2]
             log.msg('SSMIClient NACK %s' % nack_reason[reason])
         elif response_code == SSMI_RESPONSE_USSD:
-            msisdn, ussd_type, phase, message = response[2:6]
+            msisdn, ussd_type, phase = response[2:5]
+            message = ",".join(response[5:])
             if ussd_type == SSMI_USSD_TYPE_NEW:
                 if DEBUG:
                     log.msg('SSMIClient New session')

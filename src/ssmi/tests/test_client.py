@@ -1,6 +1,6 @@
 
 from twisted.trial.unittest import TestCase
-from ssmi.client import SSMIClient
+from ssmi.client import SSMIClient, LINKCHECK_PERIOD
 from ssmi.errors import SSMIRemoteServerError
 
 
@@ -22,6 +22,13 @@ class SSMIClientTestCase(TestCase):
             "phase": phase,
             "message": message,
             "genfields": genfields})
+
+    def test_default_link_check_period(self):
+        self.assertEqual(self.ssmi_client._link_check_period, LINKCHECK_PERIOD)
+
+    def test_non_default_link_check_period(self):
+        self.ssmi_client.app_setup('user', 'pass', link_check_period=15)
+        self.assertEqual(self.ssmi_client._link_check_period, 15)
 
     def test_extended_ussd_msg_recieved(self):
         self.ssmi_client.dataReceived(

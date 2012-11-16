@@ -80,7 +80,7 @@ class SSMIClient(LineReceiver):
 
     delimiter = '\r'
 
-    def __init__(self, app_register_callback=None, link_check_period=None):
+    def __init__(self, app_register_callback=None):
         """init SSMIClient.
 
         app_register_callback: lambda: callback for setup
@@ -89,15 +89,12 @@ class SSMIClient(LineReceiver):
              and other callbacks.
         """
         self._link_check_pending = 0
-        self._link_check_period = (link_check_period
-                                   if link_check_period is not None
-                                   else LINKCHECK_PERIOD)
         if app_register_callback is not None:
             # register protocol with app
             app_register_callback(self)
 
     def app_setup(self, username, password, ussd_callback=None,
-                  sms_callback=None, errback=None):
+                  sms_callback=None, errback=None, link_check_period=None):
         """Set up application callbacks to handle receiving USSD or SMS.
 
         username: string -- username for SSMI service
@@ -105,12 +102,16 @@ class SSMIClient(LineReceiver):
         ussd_callback: lambda -- callback for data received
         sms_callback: lambda -- callback for SMS received
         errback: lambda -- callback for error handling
+        linkcheck_period -- number of seconds between link checks
         """
+        if link_check_period is None:
+            link_check_period = LINKCHECK_PERIOD
         self._username = username
         self._password = password
         self._ussd_callback = ussd_callback
         self._sms_callback = sms_callback
         self._errback = errback  # WHUI
+        self._link_check_period = link_check_period
         if DEBUG:
             log.msg('SSMIClient app_setup done')
 
@@ -286,13 +287,12 @@ class SSMIClient(LineReceiver):
 
 
 class SSMIFactory(protocol.ReconnectingClientFactory):
-    def __init__(self, app_register_callback=None, link_check_period=None):
+    def __init__(self, app_register_callback=None):
         """init SSMIFactory.
 
         app_register_callback: lambda: callback for setup
         """
         self._app_register_callback = app_register_callback
-        self._link_check_period = link_check_period
 
     def startConnecting(self, connector):
         if DEBUG:
@@ -303,8 +303,7 @@ class SSMIFactory(protocol.ReconnectingClientFactory):
             log.msg('SSMIFactory Connected.')
             log.msg('SSMIFactory Resetting reconnection delay')
         self.resetDelay()
-        return SSMIClient(app_register_callback=self._app_register_callback,
-                          link_check_period=self._link_check_period)
+        return SSMIClient(app_register_callback=self._app_register_callback)
 
     def clientConnectionFailed(self, connector, reason):
         log.msg("SSMIFactory Connection failed: %s" % reason)

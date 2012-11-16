@@ -72,3 +72,14 @@ class SSMIClientTestCase(TestCase):
         [err] = self.flushLoggedErrors(SSMIRemoteServerError)
         self.assertEqual(err.value.args, ("No SSMI header. Skipping bad line"
                          " 'Garbage'",))
+
+    def test_ussd_msg_with_comma(self):
+        self.ssmi_client.dataReceived('SSMI,110,27831112222,1,0,Hello, you.\r')
+        [list_0] = self.callback_populated_list
+        self.assertEqual(list_0['message'], 'Hello, you.')
+
+    def test_extended_ussd_msg_with_comma(self):
+        self.ssmi_client.dataReceived(
+            'SSMI,111,27831112222,1,0,655011234567890:1::,Hello, you.\r')
+        [list_0] = self.callback_populated_list
+        self.assertEqual(list_0['message'], 'Hello, you.')

@@ -175,7 +175,8 @@ class SSMIClient(LineReceiver):
             reason = response[2]
             log.msg('SSMIClient NACK %s' % nack_reason[reason])
         elif response_code == SSMI_RESPONSE_USSD:
-            msisdn, ussd_type, phase, message = response[2:6]
+            msisdn, ussd_type, phase = response[2:5]
+            message = ",".join(response[5:])
             if ussd_type == SSMI_USSD_TYPE_NEW:
                 if DEBUG:
                     log.msg('SSMIClient New session')
@@ -191,7 +192,8 @@ class SSMIClient(LineReceiver):
                 self._ussd_callback(msisdn, ussd_type, phase, message)
 
         elif response_code == SSMI_RESPONSE_USSD_EXTENDED:
-            msisdn, ussd_type, phase, genfield, message = response[2:7]
+            msisdn, ussd_type, phase, genfield = response[2:6]
+            message = ",".join(response[6:])
             if ussd_type == SSMI_USSD_TYPE_NEW:
                 if DEBUG:
                     log.msg('SSMIClient New session')
@@ -205,7 +207,7 @@ class SSMIClient(LineReceiver):
             # Call a callback into the app with the message.
             if self._ussd_callback is not None:
                 self._ussd_callback(msisdn, ussd_type, phase, message,
-                                                self.parseGenfield(genfield))
+                                    self.parseGenfield(genfield))
 
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
         #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE

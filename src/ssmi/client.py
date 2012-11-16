@@ -158,7 +158,7 @@ class SSMIClient(LineReceiver):
         log.msg("SSMIClient RECV USSD: %s" % data)
         response = data.split(',')
         if not response[0] == SSMI_HEADER:
-            # logging the error is enough -- linkcheck with close
+            # logging the error is enough -- linkcheck will close
             # the transport if the connection is completely broken
             log.err(Failure(SSMIRemoteServerError(
                 'No SSMI header. Skipping bad line %r' % data)))

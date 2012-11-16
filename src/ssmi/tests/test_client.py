@@ -1,6 +1,7 @@
 
 from twisted.trial.unittest import TestCase
 from ssmi.client import SSMIClient
+from ssmi.errors import SSMIRemoteServerError
 
 
 class SSMIClientTestCase(TestCase):
@@ -65,3 +66,9 @@ class SSMIClientTestCase(TestCase):
         self.ssmi_client.dataReceived(',1,0,*156#\r')
         [list_0] = self.callback_populated_list
         self.assertEqual(list_0['message'], '*156#')
+
+    def test_bad_line_receive(self):
+        self.ssmi_client.dataReceived('Garbage\r')
+        [err] = self.flushLoggedErrors(SSMIRemoteServerError)
+        self.assertEqual(err.value.args, ("No SSMI header. Skipping bad line"
+                         " 'Garbage'",))

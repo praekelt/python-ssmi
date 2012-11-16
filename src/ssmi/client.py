@@ -89,8 +89,7 @@ class SSMIClient(LineReceiver):
              and other callbacks.
         """
         self._link_check_pending = 0
-        if app_register_callback and type(
-            app_register_callback)==type(lambda: 1):
+        if app_register_callback is not None:
             # register protocol with app
             app_register_callback(self)
 

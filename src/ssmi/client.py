@@ -4,7 +4,6 @@
 
 # Imports
 
-import time
 from types import StringTypes
 
 from twisted.protocols.basic import LineReceiver
@@ -68,6 +67,7 @@ nack_reason = {
 
 DEBUG = False
 
+
 def set_debug(debug):
     """Set global DEBUG flag."""
     global DEBUG
@@ -89,8 +89,7 @@ class SSMIClient(LineReceiver):
              and other callbacks.
         """
         self._link_check_pending = 0
-        if app_register_callback and type(
-            app_register_callback)==type(lambda: 1):
+        if app_register_callback is not None:
             # register protocol with app
             app_register_callback(self)
 
@@ -218,7 +217,6 @@ class SSMIClient(LineReceiver):
                 'SSMIClient REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip)
             self.transport.loseConnection()
 
-
 # SSMI_RESPONSE_SEQ = "100"
 # SSMI_RESPONSE_TEXT_MESSAGE = "103"
 # SSMI_RESPONSE_DELIVERY_MESSAGE = "104"
@@ -231,7 +229,6 @@ class SSMIClient(LineReceiver):
 # SSMI_RESPONSE_EXTENDED_RETURN_BINARY = "116"
 # SSMI_RESPONSE_EXTENDED_PREMIUMRATED_MESSAGE = "117"
 # SSMI_RESPONSE_EXTENDED_BINARY_PREMIUMRATED_MESSAGE = "118"
-
 
     def connectionLost(self, reason):
         if self.updateCall:

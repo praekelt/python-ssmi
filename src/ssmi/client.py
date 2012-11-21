@@ -1,6 +1,9 @@
-"""Python module for SSMI protocol to send/receive USSD and SMS."""
+# -*- coding: utf-8 -*-
+# vim:fileencoding=utf-8 ai ts=4 sts=4 et sw=4
+# Copyright 2009, 2010, 2011 Praekelt Foundation <dev@praekeltfoundation.org>
+# BSD - see LICENSE for details
 
-# Copyright 2009 Praekelt International, all rights reserved
+"""Python module for SSMI protocol to send/receive USSD and SMS."""
 
 # Imports
 

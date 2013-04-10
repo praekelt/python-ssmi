@@ -12,3 +12,4 @@ src/*.egg-info
 build
 /_trial_temp/
 /ve/
+/.tox/

@@ -4,6 +4,8 @@
 # BSD - see LICENSE for details
 
 from twisted.trial.unittest import TestCase
+from twisted.test import proto_helpers
+
 from ssmi.client import SSMIClient, LINKCHECK_PERIOD
 from ssmi.errors import SSMIRemoteServerError
 
@@ -13,8 +15,14 @@ class SSMIClientTestCase(TestCase):
     def setUp(self):
         self.callback_populated_list = []
         self.ssmi_client = SSMIClient()
+        self.protocol_transport = proto_helpers.StringTransport()
         self.ssmi_client.app_setup('user', 'pass', self.ussd_test_callback,
                                    None, None)
+        self.ssmi_client.makeConnection(self.protocol_transport)
+
+    def tearDown(self):
+        self.protocol_transport.loseConnection()
+        self.ssmi_client.updateCall.cancel()
 
     def ussd_test_callback(self, msisdn, ussd_type, phase, message,
                            genfields=None):
@@ -90,3 +98,11 @@ class SSMIClientTestCase(TestCase):
             'SSMI,111,27831112222,1,0,655011234567890:1::,Hello, you.\r')
         [list_0] = self.callback_populated_list
         self.assertEqual(list_0['message'], 'Hello, you.')
+
+    def test_send_ussd_with_unicode(self):
+        self.ssmi_client.send_ussd('27831112222', u'Hello Zoë')
+        [login, ussd_cmd, blank] = self.protocol_transport.value().split(
+            self.ssmi_client.delimiter)
+        message = ussd_cmd.split(',')[-1]
+        self.assertTrue(isinstance(message, basestring))
+        self.assertEqual(message, 'Hello Zo\xc3\xab')

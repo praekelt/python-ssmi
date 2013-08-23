@@ -82,6 +82,7 @@ class SSMIClient(LineReceiver):
     """Client for SSMI"""
 
     delimiter = '\r'
+    encoding = 'utf-8'
 
     def __init__(self, app_register_callback=None):
         """init SSMIClient.
@@ -260,7 +261,7 @@ class SSMIClient(LineReceiver):
             log.msg('SSMIClient send_ussd bad message type: %r' % message)
             return
         data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                                   ussd_type, str(message))
+                                   ussd_type, message.encode(self.encoding))
         self.sendLine(data)
         log.msg('SSMIClient SEND USSD: %s' % '_'.join(data.split('\n')))
 

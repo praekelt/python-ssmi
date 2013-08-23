@@ -1,15 +1,20 @@
-"""Python module for SSMI protocol to send/receive USSD and SMS."""
+# -*- coding: utf-8 -*-
+# vim:fileencoding=utf-8 ai ts=4 sts=4 et sw=4
+# Copyright 2009, 2010, 2011 Praekelt Foundation <dev@praekeltfoundation.org>
+# BSD - see LICENSE for details
 
-# Copyright 2009 Praekelt International, all rights reserved
+"""Python module for SSMI protocol to send/receive USSD and SMS."""
 
 # Imports
 
-import time
 from types import StringTypes
 
+from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor, protocol
 from twisted.python import log
+from twisted.python.failure import Failure
 
+from ssmi.errors import SSMIRemoteServerError
 
 # Constants
 
@@ -65,14 +70,19 @@ nack_reason = {
 
 DEBUG = False
 
+
 def set_debug(debug):
     """Set global DEBUG flag."""
     global DEBUG
     if debug:
         DEBUG = True
 
-class SSMIClient(protocol.Protocol):
+
+class SSMIClient(LineReceiver):
     """Client for SSMI"""
+
+    delimiter = '\r'
+    encoding = 'utf-8'
 
     def __init__(self, app_register_callback=None):
         """init SSMIClient.
@@ -83,13 +93,12 @@ class SSMIClient(protocol.Protocol):
              and other callbacks.
         """
         self._link_check_pending = 0
-        if app_register_callback and type(
-            app_register_callback)==type(lambda: 1):
+        if app_register_callback is not None:
             # register protocol with app
             app_register_callback(self)
 
     def app_setup(self, username, password, ussd_callback=None,
-                  sms_callback=None, errback=None):
+                  sms_callback=None, errback=None, link_check_period=None):
         """Set up application callbacks to handle receiving USSD or SMS.
 
         username: string -- username for SSMI service
@@ -97,12 +106,16 @@ class SSMIClient(protocol.Protocol):
         ussd_callback: lambda -- callback for data received
         sms_callback: lambda -- callback for SMS received
         errback: lambda -- callback for error handling
+        linkcheck_period -- number of seconds between link checks
         """
+        if link_check_period is None:
+            link_check_period = LINKCHECK_PERIOD
         self._username = username
         self._password = password
         self._ussd_callback = ussd_callback
         self._sms_callback = sms_callback
         self._errback = errback  # WHUI
+        self._link_check_period = link_check_period
         if DEBUG:
             log.msg('SSMIClient app_setup done')
 
@@ -113,11 +126,12 @@ class SSMIClient(protocol.Protocol):
         """
         if DEBUG:
             log.msg('SSMIClient logging in')
-        self.transport.write("%s,%s,%s,%s\r" % (SSMI_HEADER,
-                                                SSMI_SEND_LOGIN,
-                                                self._username,
-                                                self._password))
-        self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
+        self.sendLine("%s,%s,%s,%s" % (SSMI_HEADER,
+                                       SSMI_SEND_LOGIN,
+                                       self._username,
+                                       self._password))
+        self.updateCall = reactor.callLater(self._link_check_period,
+                                            self.linkcheck)
 
     def linkcheck(self):
         if DEBUG:
@@ -127,10 +141,11 @@ class SSMIClient(protocol.Protocol):
             log.msg('SSMIClient Link check not acked 2 times, disconnecting')
             self.transport.loseConnection()
             return
-        self.transport.write("%s,%s\r" % (SSMI_HEADER,
-                                          SSMI_SEND_LINK_CHECK))
+        self.sendLine("%s,%s" % (SSMI_HEADER,
+                                 SSMI_SEND_LINK_CHECK))
         self._link_check_pending = self._link_check_pending + 1
-        self.updateCall = reactor.callLater(LINKCHECK_PERIOD, self.linkcheck)
+        self.updateCall = reactor.callLater(self._link_check_period,
+                                            self.linkcheck)
 
     def parseGenfield(self, genfield):
         genarray = genfield.split(":")
@@ -148,13 +163,15 @@ class SSMIClient(protocol.Protocol):
         }
         return genfields
 
-    def dataReceived(self, data):
+    def lineReceived(self, data):
         log.msg("SSMIClient RECV USSD: %s" % data)
-        response = data.strip().split(',')
-        # assumption: response[0] == SSMI_HEADER
+        response = data.split(',')
         if not response[0] == SSMI_HEADER:
-            log.msg('SSMIClient FAIL: No SSMI header. Aborting')
-            reactor.stop()
+            # logging the error is enough -- linkcheck will close
+            # the transport if the connection is completely broken
+            log.err(Failure(SSMIRemoteServerError(
+                'No SSMI header. Skipping bad line %r' % data)))
+            return
         response_code = response[1]
         if response_code == SSMI_RESPONSE_ACK:
             reason = response[2]
@@ -167,7 +184,8 @@ class SSMIClient(protocol.Protocol):
             reason = response[2]
             log.msg('SSMIClient NACK %s' % nack_reason[reason])
         elif response_code == SSMI_RESPONSE_USSD:
-            msisdn, ussd_type, phase, message = response[2:6]
+            msisdn, ussd_type, phase = response[2:5]
+            message = ",".join(response[5:])
             if ussd_type == SSMI_USSD_TYPE_NEW:
                 if DEBUG:
                     log.msg('SSMIClient New session')
@@ -183,7 +201,8 @@ class SSMIClient(protocol.Protocol):
                 self._ussd_callback(msisdn, ussd_type, phase, message)
 
         elif response_code == SSMI_RESPONSE_USSD_EXTENDED:
-            msisdn, ussd_type, phase, genfield, message = response[2:7]
+            msisdn, ussd_type, phase, genfield = response[2:6]
+            message = ",".join(response[6:])
             if ussd_type == SSMI_USSD_TYPE_NEW:
                 if DEBUG:
                     log.msg('SSMIClient New session')
@@ -197,7 +216,7 @@ class SSMIClient(protocol.Protocol):
             # Call a callback into the app with the message.
             if self._ussd_callback is not None:
                 self._ussd_callback(msisdn, ussd_type, phase, message,
-                                                self.parseGenfield(genfield))
+                                    self.parseGenfield(genfield))
 
         #elif response_code == SSMI_RESPONSE_TEXT_MESSAGE
         #elif response_code == SSMI_RESPONSE_DELIVERY_MESSAGE
@@ -207,7 +226,6 @@ class SSMIClient(protocol.Protocol):
             log.msg(
                 'SSMIClient REMOTE LOGOUT RECEIVED. Other IP address: %s' % ip)
             self.transport.loseConnection()
-
 
 # SSMI_RESPONSE_SEQ = "100"
 # SSMI_RESPONSE_TEXT_MESSAGE = "103"
@@ -221,7 +239,6 @@ class SSMIClient(protocol.Protocol):
 # SSMI_RESPONSE_EXTENDED_RETURN_BINARY = "116"
 # SSMI_RESPONSE_EXTENDED_PREMIUMRATED_MESSAGE = "117"
 # SSMI_RESPONSE_EXTENDED_BINARY_PREMIUMRATED_MESSAGE = "118"
-
 
     def connectionLost(self, reason):
         if self.updateCall:
@@ -243,9 +260,9 @@ class SSMIClient(protocol.Protocol):
         if not type(message) in StringTypes:
             log.msg('SSMIClient send_ussd bad message type: %r' % message)
             return
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
-                                     ussd_type, str(message))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_USSD, msisdn,
+                                   ussd_type, message.encode(self.encoding))
+        self.sendLine(data)
         log.msg('SSMIClient SEND USSD: %s' % '_'.join(data.split('\n')))
 
     def send_sms(self, msisdn, message, validity=0):
@@ -255,9 +272,9 @@ class SSMIClient(protocol.Protocol):
         message: string(160) -- message content
         validity: integer -- validity in minutes, default 0 for a week
         """
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_SMS,
-                                     str(validity), str(msisdn), str(message))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_SMS,
+                                   str(validity), str(msisdn), str(message))
+        self.sendLine(data)
         log.msg('SSMIClient SEND SMS: %s' % data)
 
     def send_wap_push(self, msisdn, subject, url):
@@ -267,9 +284,9 @@ class SSMIClient(protocol.Protocol):
         subject: string -- subject displayed to subscriber
         url: string -- url to be sent to subscriber
         """
-        data = "%s,%s,%s,%s,%s\r" % (SSMI_HEADER, SSMI_SEND_WAP_PUSH,
-                                     str(msisdn), str(subject), str(url))
-        self.transport.write(data)
+        data = "%s,%s,%s,%s,%s" % (SSMI_HEADER, SSMI_SEND_WAP_PUSH,
+                                   str(msisdn), str(subject), str(url))
+        self.sendLine(data)
         log.msg('SSMIClient SEND WAP PUSH: %s' % data)
 
 

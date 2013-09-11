@@ -2,15 +2,16 @@ from setuptools import setup, find_packages
 
 setup(
     name="python-ssmi",
-    version="0.0.6",
+    version="0.0.7",
     url='http://github.com/praekelt/python-ssmi',
     license='BSD',
     description="Python module implementing SSMI for USSD and SMS.",
     author='Praekelt Foundation',
     author_email='dev@praekeltfoundation.org',
-    packages=find_packages('src'),
-    package_dir={'': 'src'},
-    install_requires=['setuptools'],
+    packages=find_packages(),
+    install_requires=[
+        'Twisted',
+    ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

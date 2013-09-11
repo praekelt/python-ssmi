@@ -13,3 +13,4 @@ build
 /_trial_temp/
 /ve/
 /.tox/
+*.egg-info
